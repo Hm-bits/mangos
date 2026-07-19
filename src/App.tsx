@@ -29,7 +29,7 @@ interface Player {
   potions: number;
   weapon: Weapon;
   distance: number;
-  hasSuperPower?: boolean;
+  hasSuperPower: boolean; // Menandai jika power-up sudah aktif
 }
 
 // ==========================================
@@ -51,14 +51,12 @@ const WEAPONS: Weapon[] = [
 ];
 
 export default function SimpleRPG() {
-  // Untuk meredam error TS6133 'React' is declared but never read
-  // (Sebenarnya bisa dihapus import React-nya di React modern, tapi kita keep biar aman)
   const _dummyReact = React.version; 
 
   // ==========================================
-  // STATE UTAMA GAME
+  // STATE UTAMA GAME (Sudah termasuk STONE_EVENT)
   // ==========================================
-  const [gameState, setGameState] = useState<"START" | "EXPLORE" | "BATTLE" | "SHOP" | "GAME_OVER" | "WIN">("START");
+  const [gameState, setGameState] = useState<"START" | "EXPLORE" | "BATTLE" | "SHOP" | "STONE_EVENT" | "GAME_OVER" | "WIN">("START");
   const [logs, setLogs] = useState<string[]>(["Selamat datang di Kerajaan Eldoria! Mulai petualanganmu."]);
 
   // State Pemain
@@ -73,33 +71,11 @@ export default function SimpleRPG() {
     potions: 2,
     weapon: WEAPONS[0],
     distance: 0,
+    hasSuperPower: false,
   });
 
   // State Musuh Saat Bertarung
   const [currentEnemy, setCurrentEnemy] = useState<Enemy | null>(null);
-  
-  // ==========================================
-// FITUR TAMBAHAN: BATU SUPER POWER
-// ==========================================
-// Tambahkan kondisi status baru "STONE_EVENT" pada gameState kamu
-// Ubah gameState awal kamu menjadi seperti ini atau biarkan, tapi kita tambahkan fungsi aksinya:
-
-const takeSuperPowerStone = () => {
-  setPlayer((prev) => ({
-    ...prev,
-    baseAtk: prev.baseAtk + 20, // Tambah serangan secara masif!
-    maxHp: prev.maxHp + 50,    // Tambah kapasitas HP dasar
-    hp: prev.maxHp + 50,       // Langsung sembuhkan penuh penuh
-    hasSuperPower: true
-  }));
-  addLog("🔮 Kamu mengambil Batu Mistis! Tubuhmu diselimuti aura petir. SERANGAN & HP MENINGKAT TAJAM!");
-  setGameState("EXPLORE");
-};
-
-const leaveSuperPowerStone = () => {
-  addLog("🪨 Kamu memilih mengabaikan batu tersebut karena hawanya yang mengerikan.");
-  setGameState("EXPLORE");
-};
 
   // Rekor Tertinggi (Tersimpan di LocalStorage)
   const [highScore, setHighScore] = useState<number>(0);
@@ -139,6 +115,7 @@ const leaveSuperPowerStone = () => {
       potions: 2,
       weapon: WEAPONS[0],
       distance: 0,
+      hasSuperPower: false,
     });
     setLogs(["Petualangan baru dimulai. Semoga beruntung, Pahlawan!"]);
     setGameState("EXPLORE");
@@ -150,7 +127,6 @@ const leaveSuperPowerStone = () => {
 
     // Cek kemenangan akhir pada jarak 30km
     if (nextDistance >= 30) {
-      // Spawn Boss Terakhir
       const boss = { ...ENEMIES[ENEMIES.length - 1] };
       setCurrentEnemy(boss);
       addLog(`🚨 Kamu tiba di Sarang Naga (30km)! Naga Hitam menghadang jalanmu!`);
@@ -158,18 +134,23 @@ const leaveSuperPowerStone = () => {
       return;
     }
 
-    // Menentukan kejadian acak secara random
     const rand = Math.random();
-    
+
+    // Peluang 15% ketemu batu ajaib (Hanya muncul jika pemain BELUM punya kekuatan dewa)
+    if (rand < 0.15 && !player.hasSuperPower) {
+      addLog(`🔮 Menempuh ${nextDistance} km: Ada kilatan cahaya dari bongkahan batu mistis!`);
+      setGameState("STONE_EVENT");
+      return;
+    }
+
     if (rand < 0.45) {
       // Ketemu Musuh biasa berdasarkan jarak tempuh
       let enemyIndex = 0;
-      if (nextDistance > 20) enemyIndex = 3; // Golem
-      else if (nextDistance > 12) enemyIndex = 2; // Orc
-      else if (nextDistance > 5) enemyIndex = 1; // Goblin
+      if (nextDistance > 20) enemyIndex = 3; 
+      else if (nextDistance > 12) enemyIndex = 2; 
+      else if (nextDistance > 5) enemyIndex = 1; 
 
       const enemy = { ...ENEMIES[enemyIndex] };
-      // Sedikit randomisasi HP musuh agar variatif
       const hpVariance = Math.floor(Math.random() * 7) - 3;
       enemy.maxHp = Math.max(10, enemy.maxHp + hpVariance);
       enemy.hp = enemy.maxHp;
@@ -178,45 +159,15 @@ const leaveSuperPowerStone = () => {
       addLog(`⚔️ Menempuh ${nextDistance} km: Kamu berpapasan dengan ${enemy.name}!`);
       setGameState("BATTLE");
     } else if (rand < 0.65) {
-      // Ketemu Toko / Desa
       addLog(`🏪 Menempuh ${nextDistance} km: Kamu menemukan pos perdagangan rahasia.`);
       setGameState("SHOP");
     } else if (rand < 0.8) {
-      // Menemukan Harta Karun Peti
       const foundGold = Math.floor(Math.random() * 20) + 10;
       setPlayer((prev) => ({ ...prev, gold: prev.gold + foundGold }));
       addLog(`💰 Menempuh ${nextDistance} km: Kamu menemukan peti tua berisi ${foundGold} Emas!`);
     } else {
-      // Perjalanan Aman
       addLog(`🚶 Menempuh ${nextDistance} km: Jalur aman. Kamu berjalan menyusuri hutan.`);
     }
-  const explore = () => {
-  const nextDistance = player.distance + 1;
-  setPlayer((prev) => ({ ...prev, distance: nextDistance }));
-
-  if (nextDistance >= 30) {
-    const boss = { ...ENEMIES[ENEMIES.length - 1] };
-    setCurrentEnemy(boss);
-    addLog(`🚨 Kamu tiba di Sarang Naga (30km)! Naga Hitam menghadang jalanmu!`);
-    setGameState("BATTLE");
-    return;
-  }
-
-  const rand = Math.random();
-
-  // --- KODE BARU DIMULAI DI SINI ---
-  // Peluang 15% menemukan batu ajaib jika belum punya kekuatannya
-  if (rand < 0.15 && !player.hasSuperPower) {
-    addLog(`🔮 Menempuh ${nextDistance} km: Kamu melihat sebongkah batu hitam memancarkan energi kosmis misterius!`);
-    // @ts-ignore (Mengizinkan state event baru sementara jika kamu tidak mengubah tipe di awal)
-    setGameState("STONE_EVENT"); 
-    return;
-  }
-  // --- KODE BARU SELESAI ---
-
-  // Sisa kode rand < 0.45 (BATTLE), SHOP, dan lainnya tetap sama di bawahnya...
-  if (rand < 0.45) {
-    // ... logic musuh ...
   };
 
   const usePotion = () => {
@@ -229,13 +180,36 @@ const leaveSuperPowerStone = () => {
       return;
     }
 
-    const healAmount = Math.floor(player.maxHp * 0.5); // Sembuh 50% max HP
+    const healAmount = Math.floor(player.maxHp * 0.5);
     setPlayer((prev) => ({
       ...prev,
       potions: prev.potions - 1,
       hp: Math.min(prev.maxHp, prev.hp + healAmount),
     }));
     addLog(`🧪 Kamu meminum Ramuan Penyembuh dan memulihkan ${healAmount} HP.`);
+  };
+
+  // ==========================================
+  // AKSI PILIHAN BATU SUPER POWER
+  // ==========================================
+  const takeSuperPowerStone = () => {
+    setPlayer((prev) => {
+      const updatedMaxHp = prev.maxHp + 50;
+      return {
+        ...prev,
+        baseAtk: prev.baseAtk + 20, 
+        maxHp: updatedMaxHp,
+        hp: updatedMaxHp, // Sembuhkan full ke HP baru
+        hasSuperPower: true,
+      };
+    });
+    addLog("🔮 Kamu menyerap energi batu! Aura petir meledak. STATUS MENINGKAT TAJAM!");
+    setGameState("EXPLORE");
+  };
+
+  const leaveSuperPowerStone = () => {
+    addLog("🪨 Kamu memilih melewati batu itu demi keselamatan.");
+    setGameState("EXPLORE");
   };
 
   // ==========================================
@@ -251,12 +225,10 @@ const leaveSuperPowerStone = () => {
     addLog(`⚔️ Kamu menyerang ${currentEnemy.name} sebesar ${playerDamage} kerusakan.`);
 
     if (updatedEnemyHp <= 0) {
-      // Musuh Kalah
       const gainedXp = currentEnemy.xp;
       const gainedGold = currentEnemy.gold;
       addLog(`🎉 Kamu mengalahkan ${currentEnemy.name}! Mendapat ${gainedXp} XP dan ${gainedGold} Emas.`);
 
-      // Hitung XP & Level Up
       let newXp = player.xp + gainedXp;
       let newLevel = player.level;
       let newNextXp = player.nextXp;
@@ -278,12 +250,11 @@ const leaveSuperPowerStone = () => {
         level: newLevel,
         nextXp: newNextXp,
         maxHp: newMaxHp,
-        hp: Math.min(newMaxHp, prev.hp + Math.floor(newMaxHp * 0.2)), // Pulih 20% HP setelah menang
+        hp: Math.min(newMaxHp, prev.hp + Math.floor(newMaxHp * 0.2)), 
         baseAtk: newBaseAtk,
         gold: prev.gold + gainedGold,
       }));
 
-      // Cek apakah yang dikalahkan adalah Final Boss
       if (currentEnemy.name.includes("BOSS")) {
         updateHighScore(player.distance);
         setGameState("WIN");
@@ -294,20 +265,18 @@ const leaveSuperPowerStone = () => {
       return;
     }
 
-    // 2. Giliran Musuh Menyerang (Jika musuh masih hidup)
+    // 2. Giliran Musuh Menyerang
     const enemyDamage = Math.max(1, currentEnemy.atk + Math.floor(Math.random() * 3) - 1);
     const updatedPlayerHp = Math.max(0, player.hp - enemyDamage);
 
     addLog(`💥 ${currentEnemy.name} membalas dan memberikan ${enemyDamage} kerusakan padamu.`);
 
     if (updatedPlayerHp <= 0) {
-      // Pemain Kalah
       addLog(`💀 Kamu gugur di medan perang pada jarak ${player.distance} km.`);
       updateHighScore(player.distance);
       setGameState("GAME_OVER");
     }
 
-    // Perbarui state nyawa pasca turn selesai
     setCurrentEnemy((prev) => prev ? { ...prev, hp: updatedEnemyHp } : null);
     setPlayer((prev) => ({ ...prev, hp: updatedPlayerHp }));
   };
@@ -326,7 +295,6 @@ const leaveSuperPowerStone = () => {
       setGameState("EXPLORE");
     } else {
       addLog("❌ Gagal kabur! Musuh menutup jalan pelarianmu.");
-      // Musuh langsung menyerang gratis
       const enemyDamage = currentEnemy.atk;
       const updatedPlayerHp = Math.max(0, player.hp - enemyDamage);
       
@@ -374,11 +342,16 @@ const leaveSuperPowerStone = () => {
       <div style={styles.statsPanel}>
         <div><strong>Pahlawan (Lv.{player.level})</strong></div>
         <div>❤️ HP: {player.hp} / {player.maxHp}</div>
-        <div>⚔️ Total Serangan: {player.baseAtk + player.weapon.atkBonus} <span style={{fontSize: '11px', color: '#aaa'}}>({player.baseAtk} + {player.weapon.atkBonus} {player.weapon.name})</span></div>
+        <div>⚔️ Total Serangan: {player.baseAtk + player.weapon.atkBonus} <span style={{fontSize: '11px', color: '#aaa'}}>({player.baseAtk} + {player.weapon.atkBonus})</span></div>
         <div>✨ XP: {player.xp} / {player.nextXp}</div>
         <div>💰 Emas: {player.gold}</div>
         <div>🧪 Ramuan: {player.potions}</div>
         <div>📍 Jarak: {player.distance} / 30 km</div>
+        {player.hasSuperPower && (
+          <div style={{ gridColumn: "1 / -1", color: "#a040ff", fontWeight: "bold", textAlign: "center", marginTop: "5px" }}>
+            ⚡ MODE DEWA AKTIF (ATK +20, HP +50) ⚡
+          </div>
+        )}
       </div>
 
       {/* AREA INTERAKSI UTAMA */}
@@ -388,13 +361,7 @@ const leaveSuperPowerStone = () => {
             <h3>Siap memulai petualanganmu?</h3>
             <button style={styles.btnPrimary} onClick={startNewGame}>Mulai Petualangan</button>
           </div>
-        ){/* Taruh di baris paling bawah panel stats */}
-<div>📍 Jarak: {player.distance} / 30 km</div>
-{player.hasSuperPower && (
-  <div style={{ gridColumn: "1 / -1", color: "#a040ff", fontWeight: "bold", textAlign: "center", marginTop: "5px" }}>
-    ⚡ MODE DEWA AKTIF ⚡
-  </div>
-)}}
+        )}
 
         {gameState === "EXPLORE" && (
           <div style={styles.centerContent}>
@@ -403,6 +370,21 @@ const leaveSuperPowerStone = () => {
             <div style={styles.btnGroup}>
               <button style={styles.btnSuccess} onClick={explore}>Maju Lebih Dalam (+1 km)</button>
               <button style={styles.btnInfo} onClick={usePotion}>Gunakan Ramuan (+50% HP)</button>
+            </div>
+          </div>
+        )}
+
+        {gameState === "STONE_EVENT" && (
+          <div style={styles.centerContent}>
+            <h3 style={{ color: "#a040ff" }}>🔮 Batu Kosmis Ditemukan! 🔮</h3>
+            <p>Batu purba ini memancarkan hawa panas yang dahsyat. Hancurkan untuk menyerap energinya?</p>
+            <div style={styles.btnGroup}>
+              <button style={{ ...styles.btnPrimary, backgroundColor: "#a040ff", color: "#fff" }} onClick={takeSuperPowerStone}>
+                Serap Kekuatan Dewa!
+              </button>
+              <button style={styles.btnSecondary} onClick={leaveSuperPowerStone}>
+                Abaikan & Pergi
+              </button>
             </div>
           </div>
         )}
@@ -450,21 +432,6 @@ const leaveSuperPowerStone = () => {
             </button>
           </div>
         )}
-        {/* INTERFACES UNTUK EVENT BATU KEKUATAN */}
-{gameState === "STONE_EVENT" && (
-  <div style={styles.centerContent}>
-    <h3 style={{ color: "#a040ff" }}>🔮 Batu Kosmis Ditemukan! 🔮</h3>
-    <p>Batu ini bergetar hebat. Mengambilnya akan memberimu kekuatan dewa, namun hawanya sangat tidak stabil.</p>
-    <div style={styles.btnGroup}>
-      <button style={{ ...styles.btnPrimary, backgroundColor: "#a040ff", color: "#fff" }} onClick={takeSuperPowerStone}>
-        Hancurkan & Serap Kekuatannya!
-      </button>
-      <button style={styles.btnSecondary} onClick={leaveSuperPowerStone}>
-        Biarkan Saja (Aman)
-      </button>
-    </div>
-  </div>
-)}
 
         {gameState === "GAME_OVER" && (
           <div style={styles.centerContent}>
@@ -494,7 +461,6 @@ const leaveSuperPowerStone = () => {
           ))}
         </div>
       </div>
-      {/* Trick kecil untuk meredam variabel dummy */}
       <span style={{ display: 'none' }}>{_dummyReact}</span>
     </div>
   );
