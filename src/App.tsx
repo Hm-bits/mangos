@@ -29,6 +29,7 @@ interface Player {
   potions: number;
   weapon: Weapon;
   distance: number;
+  hasSuperPower?: boolean;
 }
 
 // ==========================================
@@ -76,6 +77,29 @@ export default function SimpleRPG() {
 
   // State Musuh Saat Bertarung
   const [currentEnemy, setCurrentEnemy] = useState<Enemy | null>(null);
+  
+  // ==========================================
+// FITUR TAMBAHAN: BATU SUPER POWER
+// ==========================================
+// Tambahkan kondisi status baru "STONE_EVENT" pada gameState kamu
+// Ubah gameState awal kamu menjadi seperti ini atau biarkan, tapi kita tambahkan fungsi aksinya:
+
+const takeSuperPowerStone = () => {
+  setPlayer((prev) => ({
+    ...prev,
+    baseAtk: prev.baseAtk + 20, // Tambah serangan secara masif!
+    maxHp: prev.maxHp + 50,    // Tambah kapasitas HP dasar
+    hp: prev.maxHp + 50,       // Langsung sembuhkan penuh penuh
+    hasSuperPower: true
+  }));
+  addLog("🔮 Kamu mengambil Batu Mistis! Tubuhmu diselimuti aura petir. SERANGAN & HP MENINGKAT TAJAM!");
+  setGameState("EXPLORE");
+};
+
+const leaveSuperPowerStone = () => {
+  addLog("🪨 Kamu memilih mengabaikan batu tersebut karena hawanya yang mengerikan.");
+  setGameState("EXPLORE");
+};
 
   // Rekor Tertinggi (Tersimpan di LocalStorage)
   const [highScore, setHighScore] = useState<number>(0);
@@ -136,7 +160,7 @@ export default function SimpleRPG() {
 
     // Menentukan kejadian acak secara random
     const rand = Math.random();
-
+    
     if (rand < 0.45) {
       // Ketemu Musuh biasa berdasarkan jarak tempuh
       let enemyIndex = 0;
@@ -166,6 +190,33 @@ export default function SimpleRPG() {
       // Perjalanan Aman
       addLog(`🚶 Menempuh ${nextDistance} km: Jalur aman. Kamu berjalan menyusuri hutan.`);
     }
+  const explore = () => {
+  const nextDistance = player.distance + 1;
+  setPlayer((prev) => ({ ...prev, distance: nextDistance }));
+
+  if (nextDistance >= 30) {
+    const boss = { ...ENEMIES[ENEMIES.length - 1] };
+    setCurrentEnemy(boss);
+    addLog(`🚨 Kamu tiba di Sarang Naga (30km)! Naga Hitam menghadang jalanmu!`);
+    setGameState("BATTLE");
+    return;
+  }
+
+  const rand = Math.random();
+
+  // --- KODE BARU DIMULAI DI SINI ---
+  // Peluang 15% menemukan batu ajaib jika belum punya kekuatannya
+  if (rand < 0.15 && !player.hasSuperPower) {
+    addLog(`🔮 Menempuh ${nextDistance} km: Kamu melihat sebongkah batu hitam memancarkan energi kosmis misterius!`);
+    // @ts-ignore (Mengizinkan state event baru sementara jika kamu tidak mengubah tipe di awal)
+    setGameState("STONE_EVENT"); 
+    return;
+  }
+  // --- KODE BARU SELESAI ---
+
+  // Sisa kode rand < 0.45 (BATTLE), SHOP, dan lainnya tetap sama di bawahnya...
+  if (rand < 0.45) {
+    // ... logic musuh ...
   };
 
   const usePotion = () => {
@@ -337,7 +388,13 @@ export default function SimpleRPG() {
             <h3>Siap memulai petualanganmu?</h3>
             <button style={styles.btnPrimary} onClick={startNewGame}>Mulai Petualangan</button>
           </div>
-        )}
+        ){/* Taruh di baris paling bawah panel stats */}
+<div>📍 Jarak: {player.distance} / 30 km</div>
+{player.hasSuperPower && (
+  <div style={{ gridColumn: "1 / -1", color: "#a040ff", fontWeight: "bold", textAlign: "center", marginTop: "5px" }}>
+    ⚡ MODE DEWA AKTIF ⚡
+  </div>
+)}}
 
         {gameState === "EXPLORE" && (
           <div style={styles.centerContent}>
@@ -393,6 +450,21 @@ export default function SimpleRPG() {
             </button>
           </div>
         )}
+        {/* INTERFACES UNTUK EVENT BATU KEKUATAN */}
+{gameState === "STONE_EVENT" && (
+  <div style={styles.centerContent}>
+    <h3 style={{ color: "#a040ff" }}>🔮 Batu Kosmis Ditemukan! 🔮</h3>
+    <p>Batu ini bergetar hebat. Mengambilnya akan memberimu kekuatan dewa, namun hawanya sangat tidak stabil.</p>
+    <div style={styles.btnGroup}>
+      <button style={{ ...styles.btnPrimary, backgroundColor: "#a040ff", color: "#fff" }} onClick={takeSuperPowerStone}>
+        Hancurkan & Serap Kekuatannya!
+      </button>
+      <button style={styles.btnSecondary} onClick={leaveSuperPowerStone}>
+        Biarkan Saja (Aman)
+      </button>
+    </div>
+  </div>
+)}
 
         {gameState === "GAME_OVER" && (
           <div style={styles.centerContent}>
